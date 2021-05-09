@@ -106,18 +106,37 @@ class ODEBlock(nn.Module):
         super(ODEBlock, self).__init__()
         # Task 1.
         # TODO : implement this
+        self.device = device
         self.odefunc = odefunc.to(device)
+        self.tol = tol
         self.solver = odeint_adjoint if adjoint else odeint
         self.is_conv = is_conv
 
     def forward(self, x, eval_times=None):
         # Task 1. 
         # TODO : implement this
+
+        if self.is_conv:
+          x = torch.cat([x, torch.zeros(x.shape[0], self.odefunc.augment_dim, x.shape[2], x.shape[3]).to(self.device)], dim=1)
+        else:
+          x = torch.cat([x, torch.zeros(x.shape[0], self.odefunc.augment_dim).to(self.device)], dim=1)
+
+        self.odefunc.nfe = 0
+
         if eval_times is None:
-            eval_times = torch.ones(1)
-            
-        return self.solver(self.odefunc, x, eval_times)
-    
+          t = torch.Tensor([0, 1]).type(x.type())
+        else:
+          t = eval_times.type(x.type())
+
+        # preds = self.solver(self.odefunc, x, t)
+        preds = self.solver(self.odefunc, x, t,
+                                 rtol=self.tol, atol=self.tol)
+
+        if eval_times is None:
+          return preds[1]
+        else:
+          return preds
+
     def trajectory(self, x, timesteps):
         """Returns ODE trajectory.
 

@@ -15,7 +15,7 @@ class Conv2dTime(nn.Conv2d):
     def forward(self, t, x):
         # Task2
         # TODO : implement this 
-        x = torch.cat([x, t * torch.ones(x.shape[0], 1, x.shape[2], x.shape[3])], dim=1)
+        x = torch.cat([x, t * torch.ones(x.shape[0], 1, x.shape[2], x.shape[3]).to(x.device)], dim=1)
         return super(Conv2dTime, self).forward(x)
 
 class ConvODEFunc(nn.Module):
@@ -45,22 +45,21 @@ class ConvODEFunc(nn.Module):
         super(ConvODEFunc, self).__init__()
         # Task 2. 
         # TODO : implement this
+        self.augment_dim = augment_dim
         self.active = nn.ReLU() if non_linearity=='relu' else nn.Softplus()
         self.time_dependent = time_dependent
-#         self.augment_dim = augment_dim
         if time_dependent:
-            self.conv_0 = Conv2dTime(img_size[0] + augment_dim, num_filters, 3, padding=1)
+            self.conv_1 = Conv2dTime(img_size[0] + augment_dim, num_filters, 3, padding=1).to(device)
         else:
-            self.conv_0 = nn.Conv2d(img_size[0] + augment_dim, num_filters, 3, padding=1)
+            self.conv_1 = nn.Conv2d(img_size[0] + augment_dim, num_filters, 3, padding=1).to(device)
         self.layers = nn.Sequential(
-            self.conv_0,
             self.active,
             nn.Conv2d(num_filters, num_filters, 3, padding=1),
             self.active,
             nn.Conv2d(num_filters, img_size[0] + augment_dim, 3, padding=1),
         ).to(device)
         self.nfe = 0
-#         self.augmentation = torch.zeros(x.shape[0], augment_dim, x.shape[2], x.shape[3])        
+             
     def forward(self, t, x):
         """
         Parameters
@@ -74,13 +73,13 @@ class ConvODEFunc(nn.Module):
         # Task 2. 
         # TODO : implement this
         self.nfe += 1
-#         x = torch.cat([x, augmentation], dim=1)
+
         if self.time_dependent:
-            return self.layers(t, x)
+          output = self.conv_1(t, x)
         else:
-            return self.layers(x)
-#         self.augmentation = augmented_output[:, -self.augment_dim:]
-#         return augmented_output[:, :-self.augment_dim]
+          output = x
+        
+        return self.layers(output)
     
 class ConvODENet(nn.Module):
     """Creates an ODEBlock with a convolutional ODEFunc followed by a Linear
